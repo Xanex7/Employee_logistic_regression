@@ -11,7 +11,7 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__)) # points to /api
 PARENT_DIR = os.path.dirname(CURRENT_DIR)               # points to project root
 
 # Candidate model filenames
-MODEL_FILENAMES = ["model_logistic.pkl", "model_logistic_regression.pkl"]
+MODEL_FILENAMES = ["model_logistic_regression_2.pkl", "model_logistic.pkl", "model_logistic_regression.pkl"]
 
 MODEL_PATH = None
 for filename in MODEL_FILENAMES:
@@ -448,7 +448,7 @@ HTML_TEMPLATE = """
     <div class="header-section">
         <span class="title-badge">HR Executive Intelligence</span>
         <h1 class="main-title">Workforce Attrition Predictor</h1>
-        <p class="main-subtitle">Analyze demographics, tenure, tier status, and bench history to forecast employee attrition risks in real-time.</p>
+        <p class="main-subtitle">Analyze demographics, tenure, tier status, and bench history to forecast employee turnover status in real-time.</p>
     </div>
 
     <div class="grid-layout">
@@ -548,7 +548,7 @@ HTML_TEMPLATE = """
                 </div>
 
                 <div class="valuation-card" id="resultCard">
-                    <div class="val-tag">Predicted Retention Status</div>
+                    <div class="val-tag">Predicted Outcome</div>
                     <div class="val-price">
                         <i class="fa-solid fa-shield-halved" id="resultIcon" style="color: var(--amber-glow);"></i>
                         <span id="resultOutput">Awaiting Input</span>
@@ -561,7 +561,7 @@ HTML_TEMPLATE = """
                         </div>
                         <div class="f-badge">
                             <div class="f-badge-title">Risk Level</div>
-                            <div class="f-badge-val" id="badgeRisk">Minimal</div>
+                            <div class="f-badge-val" id="badgeRisk">Pending</div>
                         </div>
                     </div>
                 </div>
@@ -580,7 +580,7 @@ HTML_TEMPLATE = """
 </footer>
 
 <script>
-    let lastResult = "Retained";
+    let lastResult = "Awaiting Input";
 
     function updateTenure(year) {
         if (year && year > 0) {
@@ -626,20 +626,23 @@ HTML_TEMPLATE = """
                     lastResult = data.prediction;
                     resultOutput.textContent = data.prediction;
                     
-                    if (data.prediction === "Retained") {
-                        resultCard.style.background = "linear-gradient(180deg, rgba(16, 185, 129, 0.15) 0%, rgba(10, 13, 20, 0.05) 100%)";
-                        resultCard.style.borderColor = "rgba(16, 185, 129, 0.4)";
-                        resultIcon.className = "fa-solid fa-circle-check";
-                        resultIcon.style.color = "var(--emerald-glow)";
-                        badgeRisk.textContent = "Low Risk";
-                        badgeRisk.style.color = "var(--emerald-glow)";
-                    } else {
+                    // Dynamic visual output based on exact user mapping:
+                    // 0 -> Leave (Rose Red)
+                    // 1 -> No Leave (Emerald Green)
+                    if (data.prediction === "Leave") {
                         resultCard.style.background = "linear-gradient(180deg, rgba(244, 63, 94, 0.15) 0%, rgba(10, 13, 20, 0.05) 100%)";
                         resultCard.style.borderColor = "rgba(244, 63, 94, 0.4)";
-                        resultIcon.className = "fa-solid fa-triangle-exclamation";
+                        resultIcon.className = "fa-solid fa-person-walking-arrow-right";
                         resultIcon.style.color = "var(--rose-glow)";
-                        badgeRisk.textContent = "High Risk";
+                        badgeRisk.textContent = "High Attrition Risk";
                         badgeRisk.style.color = "var(--rose-glow)";
+                    } else if (data.prediction === "No Leave") {
+                        resultCard.style.background = "linear-gradient(180deg, rgba(16, 185, 129, 0.15) 0%, rgba(10, 13, 20, 0.05) 100%)";
+                        resultCard.style.borderColor = "rgba(16, 185, 129, 0.4)";
+                        resultIcon.className = "fa-solid fa-user-check";
+                        resultIcon.style.color = "var(--emerald-glow)";
+                        badgeRisk.textContent = "Retained";
+                        badgeRisk.style.color = "var(--emerald-glow)";
                     }
                     
                     if (window.innerWidth <= 1024) {
@@ -678,7 +681,7 @@ HTML_TEMPLATE = """
         
         doc.setFontSize(14);
         doc.setFont("helvetica", "bold");
-        doc.text("Forecasted Retention Status: " + lastResult, 20, 48);
+        doc.text("Forecasted Outcome: " + lastResult, 20, 48);
         
         doc.setFontSize(11);
         doc.setFont("helvetica", "normal");
@@ -707,7 +710,6 @@ def handler():
         return jsonify({'status': 'error', 'message': 'Logistic Regression model not loaded on server. Verify file location.'}), 500
         
     try:
-        # Match exact 8 feature column names from pickled model
         data_dict = {
             'Education': [float(request.form['Education'])],
             'JoiningYear': [float(request.form['JoiningYear'])],
@@ -722,10 +724,12 @@ def handler():
         features_df = pd.DataFrame(data_dict)
         raw_pred = int(model.predict(features_df)[0])
         
-        # Binary Classification Mapping
+        # Exact Requested Mapping:
+        # 0 -> Leave
+        # 1 -> No Leave
         label_mapping = {
-            0: "Retained",
-            1: "At-Risk / Attrition"
+            0: "Leave",
+            1: "No Leave"
         }
         
         final_output = label_mapping.get(raw_pred, f"Class [{raw_pred}]")
