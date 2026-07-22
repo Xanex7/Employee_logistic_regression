@@ -12,7 +12,12 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__)) # points to /api
 PARENT_DIR = os.path.dirname(CURRENT_DIR)               # points to project root
 
 # Candidate model filenames
-MODEL_FILENAMES = ["model_logistic_regression_2.pkl", "model_logistic.pkl", "model_logistic_regression.pkl"]
+MODEL_FILENAMES = [
+    "model_logistic_regression_3.pkl", 
+    "model_logistic_regression_2.pkl", 
+    "model_logistic.pkl", 
+    "model_logistic_regression.pkl"
+]
 
 MODEL_PATH = None
 for filename in MODEL_FILENAMES:
@@ -860,9 +865,12 @@ def handler():
             probs = model.predict_proba(features_df)[0]
             prob_score = float(probs[raw_pred])
         
+        # Standard HR Attrition dataset mapping:
+        # 1 -> Leave (Employee left)
+        # 0 -> No Leave (Employee retained)
         label_mapping = {
-            0: "Leave",
-            1: "No Leave"
+            1: "Leave",
+            0: "No Leave"
         }
         
         final_output = label_mapping.get(raw_pred, f"Class [{raw_pred}]")
