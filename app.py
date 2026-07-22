@@ -6,18 +6,35 @@ from flask import Flask, request, jsonify, render_template_string
 
 app = Flask(__name__)
 
-# Resolve path for Vercel serverless environment
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODEL_PATH = os.path.join(BASE_DIR, "model_logistic.pkl")
+# Absolute Path Resolution for Vercel Serverless Environments
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__)) # points to /api
+PARENT_DIR = os.path.dirname(CURRENT_DIR)               # points to project root
 
-try:
-    with open(MODEL_PATH, "rb") as f:
-        model = pickle.load(f)
-except Exception as e:
-    print(f"Error loading model: {e}")
-    model = None
+# Candidate model filenames
+MODEL_FILENAMES = ["model_logistic.pkl", "model_logistic_regression.pkl"]
 
-# Executive Amber Glassmorphism UI
+MODEL_PATH = None
+for filename in MODEL_FILENAMES:
+    root_path = os.path.join(PARENT_DIR, filename)
+    api_path = os.path.join(CURRENT_DIR, filename)
+    
+    if os.path.exists(root_path):
+        MODEL_PATH = root_path
+        break
+    elif os.path.exists(api_path):
+        MODEL_PATH = api_path
+        break
+
+# Load model pickle
+model = None
+if MODEL_PATH:
+    try:
+        with open(MODEL_PATH, "rb") as f:
+            model = pickle.load(f)
+        print(f"Model loaded successfully from: {MODEL_PATH}")
+    except Exception as e:
+        print(f"Error loading model: {e}")
+
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -25,7 +42,7 @@ HTML_TEMPLATE = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TalentPulse AI | Workforce Analytics Engine</title>
-    <!-- Google Fonts & FontAwesome & jsPDF -->
+    <!-- Google Fonts, FontAwesome, jsPDF -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -436,7 +453,7 @@ HTML_TEMPLATE = """
 
     <div class="grid-layout">
         
-        <!-- Left: Form Inputs -->
+        <!-- Left Column: Inputs -->
         <div class="glass-card">
             <div class="section-header">
                 <span class="section-title"><i class="fa-solid fa-sliders"></i> Employee Attributes</span>
@@ -523,7 +540,7 @@ HTML_TEMPLATE = """
             </form>
         </div>
 
-        <!-- Right: Output Sidebar -->
+        <!-- Right Column: Output Card -->
         <div class="sticky-sidebar" id="outputSection">
             <div class="glass-card">
                 <div class="section-header">
@@ -687,10 +704,10 @@ def handler():
         return render_template_string(HTML_TEMPLATE)
         
     if model is None:
-        return jsonify({'status': 'error', 'message': 'Logistic Regression model not loaded.'}), 500
+        return jsonify({'status': 'error', 'message': 'Logistic Regression model not loaded on server. Verify file location.'}), 500
         
     try:
-        # Build features dataframe matching exact model metadata keys
+        # Match exact 8 feature column names from pickled model
         data_dict = {
             'Education': [float(request.form['Education'])],
             'JoiningYear': [float(request.form['JoiningYear'])],
@@ -705,7 +722,7 @@ def handler():
         features_df = pd.DataFrame(data_dict)
         raw_pred = int(model.predict(features_df)[0])
         
-        # Categorical Text Mapping
+        # Binary Classification Mapping
         label_mapping = {
             0: "Retained",
             1: "At-Risk / Attrition"
