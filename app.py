@@ -2,6 +2,7 @@ import os
 import pickle
 import numpy as np
 import pandas as pd
+from datetime import datetime
 from flask import Flask, request, jsonify, render_template_string
 
 app = Flask(__name__)
@@ -41,7 +42,7 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TalentPulse AI | Workforce Analytics Engine</title>
+    <title>TalentPulse AI | Employee Turnover Analytics</title>
     <!-- Google Fonts, FontAwesome, jsPDF -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -137,7 +138,7 @@ HTML_TEMPLATE = """
         }
 
         .workspace-container {
-            max-width: 1400px;
+            max-width: 1440px;
             margin: 35px auto;
             padding: 0 4%;
             width: 100%;
@@ -182,7 +183,7 @@ HTML_TEMPLATE = """
 
         .grid-layout {
             display: grid;
-            grid-template-columns: 1.85fr 1.15fr;
+            grid-template-columns: 1.8fr 1.2fr;
             gap: 32px;
             align-items: start;
         }
@@ -320,7 +321,7 @@ HTML_TEMPLATE = """
             background: linear-gradient(180deg, rgba(245, 158, 11, 0.12) 0%, rgba(10, 13, 20, 0.05) 100%);
             border: 1px solid rgba(245, 158, 11, 0.3);
             border-radius: 20px;
-            padding: 26px;
+            padding: 24px;
             text-align: center;
         }
 
@@ -342,6 +343,34 @@ HTML_TEMPLATE = """
             align-items: center;
             justify-content: center;
             gap: 10px;
+        }
+
+        .progress-container {
+            margin-top: 16px;
+            text-align: left;
+        }
+
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.78rem;
+            color: var(--text-sub);
+            margin-bottom: 6px;
+        }
+
+        .progress-bar-bg {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--amber-glow);
+            width: 0%;
+            transition: width 0.4s ease;
         }
 
         .feature-badge-grid {
@@ -371,6 +400,44 @@ HTML_TEMPLATE = """
             font-weight: 700;
             color: var(--amber-bright);
             margin-top: 4px;
+        }
+
+        .history-box {
+            margin-top: 20px;
+            max-height: 220px;
+            overflow-y: auto;
+        }
+
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+            text-align: left;
+        }
+
+        .history-table th {
+            color: var(--text-sub);
+            padding: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.7rem;
+        }
+
+        .history-table td {
+            padding: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .tag-leave {
+            color: var(--rose-glow);
+            font-weight: 700;
+        }
+
+        .tag-noleave {
+            color: var(--emerald-glow);
+            font-weight: 700;
         }
 
         .btn-report {
@@ -440,15 +507,15 @@ HTML_TEMPLATE = """
         <span>TalentPulse<span style="color: var(--amber-glow);">.ai</span></span>
     </div>
     <div class="nav-tag">
-        <i class="fa-solid fa-microchip"></i> Logistic Regression Engine
+        <i class="fa-solid fa-microchip"></i> Employee Turnover Predictor
     </div>
 </nav>
 
 <div class="workspace-container">
     <div class="header-section">
         <span class="title-badge">HR Executive Intelligence</span>
-        <h1 class="main-title">Workforce Attrition Predictor</h1>
-        <p class="main-subtitle">Analyze demographics, tenure, tier status, and bench history to forecast employee turnover status in real-time.</p>
+        <h1 class="main-title">Employee Turnover Predictor</h1>
+        <p class="main-subtitle">Analyze demographics, tenure, tier status, and bench history to forecast turnover risks in real-time.</p>
     </div>
 
     <div class="grid-layout">
@@ -534,13 +601,13 @@ HTML_TEMPLATE = """
                 </div>
 
                 <button type="submit" class="btn-predict" id="submitBtn">
-                    <span class="btn-text">Execute Attrition Assessment</span>
+                    <span class="btn-text">Execute Turnover Assessment</span>
                     <div class="spinner" id="btnSpinner"></div>
                 </button>
             </form>
         </div>
 
-        <!-- Right Column: Output Card -->
+        <!-- Right Column: Output Card & History -->
         <div class="sticky-sidebar" id="outputSection">
             <div class="glass-card">
                 <div class="section-header">
@@ -548,10 +615,20 @@ HTML_TEMPLATE = """
                 </div>
 
                 <div class="valuation-card" id="resultCard">
-                    <div class="val-tag">Predicted Outcome</div>
+                    <div class="val-tag">Turnover Forecast</div>
                     <div class="val-price">
                         <i class="fa-solid fa-shield-halved" id="resultIcon" style="color: var(--amber-glow);"></i>
                         <span id="resultOutput">Awaiting Input</span>
+                    </div>
+
+                    <div class="progress-container">
+                        <div class="progress-label">
+                            <span>Model Confidence Score</span>
+                            <strong id="probLabel">0%</strong>
+                        </div>
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill" id="probFill"></div>
+                        </div>
                     </div>
 
                     <div class="feature-badge-grid">
@@ -560,14 +637,36 @@ HTML_TEMPLATE = """
                             <div class="f-badge-val" id="badgeTenure">5 Yrs</div>
                         </div>
                         <div class="f-badge">
-                            <div class="f-badge-title">Risk Level</div>
+                            <div class="f-badge-title">Risk Classification</div>
                             <div class="f-badge-val" id="badgeRisk">Pending</div>
                         </div>
                     </div>
                 </div>
 
+                <!-- Session Audit Log -->
+                <div style="margin-top: 24px;">
+                    <div class="section-title" style="font-size: 1rem;"><i class="fa-solid fa-clock-rotate-left"></i> Evaluation Audit Log</div>
+                    <div class="history-box">
+                        <table class="history-table">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Age</th>
+                                    <th>Tenure</th>
+                                    <th>Forecast</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historyLog">
+                                <tr>
+                                    <td colspan="4" style="color: var(--text-sub); text-align: center;">No evaluations recorded.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <button type="button" class="btn-report" onclick="downloadPDFReport()">
-                    <i class="fa-solid fa-file-pdf"></i> Download Executive HR Brief
+                    <i class="fa-solid fa-file-pdf"></i> Download Executive Brief
                 </button>
             </div>
         </div>
@@ -581,6 +680,7 @@ HTML_TEMPLATE = """
 
 <script>
     let lastResult = "Awaiting Input";
+    let historyRecords = [];
 
     function updateTenure(year) {
         if (year && year > 0) {
@@ -600,11 +700,13 @@ HTML_TEMPLATE = """
         const resultIcon = document.getElementById('resultIcon');
         const resultCard = document.getElementById('resultCard');
         const badgeRisk = document.getElementById('badgeRisk');
+        const probLabel = document.getElementById('probLabel');
+        const probFill = document.getElementById('probFill');
         const outputSection = document.getElementById('outputSection');
         
         submitBtn.disabled = true;
         spinner.style.display = 'block';
-        btnText.textContent = 'Analyzing Logistic Weights...';
+        btnText.textContent = 'Calculating Logistic Matrix...';
         
         const formData = new FormData(form);
         
@@ -626,24 +728,34 @@ HTML_TEMPLATE = """
                     lastResult = data.prediction;
                     resultOutput.textContent = data.prediction;
                     
-                    // Dynamic visual output based on exact user mapping:
-                    // 0 -> Leave (Rose Red)
-                    // 1 -> No Leave (Emerald Green)
+                    let probPct = (data.probability * 100).toFixed(1) + '%';
+                    probLabel.textContent = probPct;
+                    probFill.style.width = probPct;
+                    
                     if (data.prediction === "Leave") {
                         resultCard.style.background = "linear-gradient(180deg, rgba(244, 63, 94, 0.15) 0%, rgba(10, 13, 20, 0.05) 100%)";
                         resultCard.style.borderColor = "rgba(244, 63, 94, 0.4)";
                         resultIcon.className = "fa-solid fa-person-walking-arrow-right";
                         resultIcon.style.color = "var(--rose-glow)";
-                        badgeRisk.textContent = "High Attrition Risk";
+                        probFill.style.background = "var(--rose-glow)";
+                        badgeRisk.textContent = "High Turnover Risk";
                         badgeRisk.style.color = "var(--rose-glow)";
                     } else if (data.prediction === "No Leave") {
                         resultCard.style.background = "linear-gradient(180deg, rgba(16, 185, 129, 0.15) 0%, rgba(10, 13, 20, 0.05) 100%)";
                         resultCard.style.borderColor = "rgba(16, 185, 129, 0.4)";
                         resultIcon.className = "fa-solid fa-user-check";
                         resultIcon.style.color = "var(--emerald-glow)";
+                        probFill.style.background = "var(--emerald-glow)";
                         badgeRisk.textContent = "Retained";
                         badgeRisk.style.color = "var(--emerald-glow)";
                     }
+                    
+                    addHistoryRecord(
+                        new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                        form.elements['Age'].value,
+                        document.getElementById('badgeTenure').textContent,
+                        data.prediction
+                    );
                     
                     if (window.innerWidth <= 1024) {
                         outputSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -654,16 +766,34 @@ HTML_TEMPLATE = """
                 
                 submitBtn.disabled = false;
                 spinner.style.display = 'none';
-                btnText.textContent = 'Execute Attrition Assessment';
+                btnText.textContent = 'Execute Turnover Assessment';
             }, 400);
 
         } catch (error) {
             submitBtn.disabled = false;
             spinner.style.display = 'none';
-            btnText.textContent = 'Execute Attrition Assessment';
+            btnText.textContent = 'Execute Turnover Assessment';
             resultOutput.textContent = error.message;
         }
     });
+
+    function addHistoryRecord(time, age, tenure, result) {
+        historyRecords.unshift({ time, age, tenure, result });
+        const historyLog = document.getElementById('historyLog');
+        historyLog.innerHTML = '';
+        
+        historyRecords.forEach(rec => {
+            const tr = document.createElement('tr');
+            const resultClass = rec.result === 'Leave' ? 'tag-leave' : 'tag-noleave';
+            tr.innerHTML = `
+                <td>${rec.time}</td>
+                <td>${rec.age}</td>
+                <td>${rec.tenure}</td>
+                <td class="${resultClass}">${rec.result}</td>
+            `;
+            historyLog.appendChild(tr);
+        });
+    }
 
     function downloadPDFReport() {
         const { jsPDF } = window.jspdf;
@@ -671,7 +801,7 @@ HTML_TEMPLATE = """
         
         doc.setFont("helvetica", "bold");
         doc.setFontSize(20);
-        doc.text("TalentPulse AI - HR Risk Brief", 20, 22);
+        doc.text("TalentPulse AI - Employee Turnover Brief", 20, 22);
         
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
@@ -681,18 +811,19 @@ HTML_TEMPLATE = """
         
         doc.setFontSize(14);
         doc.setFont("helvetica", "bold");
-        doc.text("Forecasted Outcome: " + lastResult, 20, 48);
+        doc.text("Forecasted Turnover Status: " + lastResult, 20, 48);
         
         doc.setFontSize(11);
         doc.setFont("helvetica", "normal");
         doc.text("Tenure: " + document.getElementById('badgeTenure').textContent, 20, 60);
         doc.text("Risk Classification: " + document.getElementById('badgeRisk').textContent, 20, 68);
+        doc.text("Confidence Score: " + document.getElementById('probLabel').textContent, 20, 76);
         
-        doc.line(20, 78, 190, 78);
+        doc.line(20, 85, 190, 85);
         doc.setFontSize(9);
-        doc.text("Disclaimer: Predicted output generated via Logistic Regression classification model.", 20, 88);
+        doc.text("Disclaimer: Predicted output generated via Logistic Regression classification model.", 20, 95);
         
-        doc.save("HR_Retention_Report.pdf");
+        doc.save("Employee_Turnover_Report.pdf");
     }
 </script>
 
@@ -724,9 +855,11 @@ def handler():
         features_df = pd.DataFrame(data_dict)
         raw_pred = int(model.predict(features_df)[0])
         
-        # Exact Requested Mapping:
-        # 0 -> Leave
-        # 1 -> No Leave
+        prob_score = 0.5
+        if hasattr(model, "predict_proba"):
+            probs = model.predict_proba(features_df)[0]
+            prob_score = float(probs[raw_pred])
+        
         label_mapping = {
             0: "Leave",
             1: "No Leave"
@@ -736,7 +869,8 @@ def handler():
         
         return jsonify({
             'status': 'success',
-            'prediction': final_output
+            'prediction': final_output,
+            'probability': round(prob_score, 3)
         })
         
     except Exception as e:
